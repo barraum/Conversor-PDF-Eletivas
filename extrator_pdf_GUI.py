@@ -27,7 +27,8 @@ def extract_data_from_pdf_multiline(pdf_bytes_io): # Modificado para aceitar byt
         "Procedimento Solic. Vaga Cartão SUS Data Nasc.", "Pág."
     ]
     total_procedimentos_pdf_sum = 0
-    regex_total_procedimento = re.compile(r"Total procedimento:\s*(\d{1,4})")
+    regex_total_procedimento = re.compile(r"Total procedimento:\s*(\d+)")
+    split_date_at_end = re.compile(r"^(.*?)(\d{2}/\d{2}/\d{4})$")
     
     try:
         # Modificado: Abrir PDF a partir de bytes
@@ -43,10 +44,24 @@ def extract_data_from_pdf_multiline(pdf_bytes_io): # Modificado para aceitar byt
     for page_num in range(len(doc)):
         page = doc.load_page(page_num)
         text = page.get_text("text")
-        lines = text.split('\n')
-        for line_num, raw_line in enumerate(lines):
-            line = raw_line.strip()
-            if not line: continue
+        raw_lines = text.split('\n')
+        
+        # Pré-processamento: desacopla datas que vieram coladas na mesma linha de procedimentos
+        lines = []
+        for rl in raw_lines:
+            s = rl.strip()
+            if not s: continue
+            if any(sk.lower() in s.lower() for sk in ["emissão:"]):
+                lines.append(s)
+                continue
+            m = split_date_at_end.match(s)
+            if m and m.group(1).strip():
+                lines.append(m.group(1).strip())
+                lines.append(m.group(2).strip())
+            else:
+                lines.append(s)
+
+        for line_num, line in enumerate(lines):
 
             found_skip_keyword = False
             triggered_skip_keyword = None
